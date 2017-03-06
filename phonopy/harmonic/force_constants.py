@@ -136,10 +136,14 @@ def cutoff_force_constants(force_constants,
                 force_constants[i, j] = 0.0
 
 
-def symmetrize_force_constants(force_constants, iteration=3):
+def symmetrize_force_constants(force_constants,
+                               iteration=3,
+                               translational_symmetry_type=1):
     for i in range(iteration):
         set_permutation_symmetry(force_constants)
-        set_translational_invariance(force_constants)
+        set_translational_invariance(
+            force_constants,
+            translational_symmetry_type=translational_symmetry_type)
 
 def distribute_force_constants(force_constants,
                                atom_list,
@@ -378,35 +382,9 @@ def set_translational_invariance(force_constants,
     translational invariance. If the sum is not zero, this error is
     uniformly subtracted from force constants.
     """
-    for i in range(2):
-       set_translational_invariance_per_index(
-           force_constants,
-           index=i,
-           translational_symmetry_type=translational_symmetry_type)
-
-def set_translational_invariance_per_index(fc2,
-                                           index=0,
-                                           translational_symmetry_type=1):
-        for i in range(fc2.shape[1 - index]):
-            for j, k in list(np.ndindex(3, 3)):
-                if translational_symmetry_type == 2: # Type 2
-                    if index == 0:
-                        fc_abs = np.abs(fc2[:, i, j, k])
-                        fc_sum = np.sum(fc2[:, i, j, k])
-                        fc_abs_sum = np.sum(fc_abs)
-                        fc2[:, i, j, k] -= fc_sum / fc_abs_sum * fc_abs
-                    else:
-                        fc_abs = np.abs(fc2[i, :, j, k])
-                        fc_sum = np.sum(fc2[i, :, j, k])
-                        fc_abs_sum = np.sum(fc_abs)
-                        fc2[i, :, j, k] -= fc_sum / fc_abs_sum * fc_abs
-                else: # Type 1
-                    if index == 0:
-                        fc2[:, i, j, k] -= np.sum(
-                            fc2[:, i, j, k]) / fc2.shape[0]
-                    else:
-                        fc2[i, :, j, k] -= np.sum(
-                            fc2[i, :, j, k]) / fc2.shape[1]
+    _set_translational_invariance(
+        force_constants,
+        translational_symmetry_type=translational_symmetry_type)
 
 def set_permutation_symmetry(force_constants):
     """
@@ -422,8 +400,7 @@ def set_permutation_symmetry(force_constants):
     fc_copy = force_constants.copy()
     for i in range(force_constants.shape[0]):
         for j in range(force_constants.shape[1]):
-            force_constants[i, j] = (force_constants[i, j] +
-                                     fc_copy[j, i].T) / 2
+            force_constants[i, j] = (fc_copy[i, j] + fc_copy[j, i].T) / 2
 
 def rotational_invariance(force_constants,
                           supercell,
@@ -485,7 +462,7 @@ def show_drift_force_constants(force_constants, name="force constants"):
         if abs(val2) > abs(maxval2):
             maxval2 = val2
             jk2 = [j, k]
-    print("max drift of %s: %f (%s%s) %f (%s%s)" %
+    print("max drift of %s: %e (%s%s) %e (%s%s)" %
           (name,
            maxval1, "xyz"[jk1[0]], "xyz"[jk1[1]],
            maxval2, "xyz"[jk2[0]], "xyz"[jk2[1]]))
@@ -790,3 +767,16 @@ def _get_atom_mapping_by_symmetry(atom_list_done,
     print("Input forces are not enough to calculate force constants,")
     print("or something wrong (e.g. crystal structure does not match).")
     raise ValueError
+
+def _set_translational_invariance(fc2, translational_symmetry_type=1):
+    if translational_symmetry_type == 1:
+        fc_sums = [fc2.sum(axis=i) / fc2.shape[i] for i in range(2)]
+        for i in range(fc2.shape[0]):
+            for j in range(fc2.shape[1]):
+                fc2[i, j] -= (fc_sums[0][j] + fc_sums[1][i]) / 2
+    else: # 'else' is considerted as the default behaviour.
+        # assume fc is symmetric.
+        fc_sums = [fc2.sum(axis=i) for i in range(2)]
+        for i in range(fc2.shape[0]):
+            fc2[i, i] = fc2[i, i] - (fc_sums[0][i] + fc_sums[1][i]) / 2
+

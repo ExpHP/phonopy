@@ -44,7 +44,8 @@ from phonopy.harmonic.force_constants import (get_fc2,
                                               symmetrize_force_constants,
                                               rotational_invariance,
                                               cutoff_force_constants,
-                                              set_tensor_symmetry)
+                                              set_tensor_symmetry,
+                                              show_drift_force_constants)
 from phonopy.harmonic.dynamical_matrix import (DynamicalMatrix,
                                                DynamicalMatrixNAC)
 from phonopy.phonon.band_structure import BandStructure
@@ -370,7 +371,13 @@ class Phonopy(object):
         return True
 
     def symmetrize_force_constants(self, iteration=3):
+        show_drift_force_constants(
+            self._force_constants,
+            name="force constants before symmetrization")
         symmetrize_force_constants(self._force_constants, iteration)
+        show_drift_force_constants(
+            self._force_constants,
+            name="force constants after symmetrization")
         self._set_dynamical_matrix()
 
     def symmetrize_force_constants_by_space_group(self):
