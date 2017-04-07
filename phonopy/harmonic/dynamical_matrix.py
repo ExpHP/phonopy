@@ -359,8 +359,8 @@ def get_equivalent_smallest_vectors(atom_number_supercell,
                                     atom_number_primitive,
                                     supercell,
                                     primitive_lattice,
+                                    reduced_bases,
                                     symprec):
-    reduced_bases = get_reduced_bases(supercell.get_cell(), symprec)
     positions = np.dot(supercell.get_positions(), np.linalg.inv(reduced_bases))
 
     # Atomic positions are confined into the lattice made of reduced bases.
@@ -415,12 +415,15 @@ def get_smallest_vectors(supercell, primitive, symprec):
     shortest_vectors = np.zeros((size_super, size_prim, 27, 3), dtype='double')
     multiplicity = np.zeros((size_super, size_prim), dtype='intc')
 
+    reduced_bases = get_reduced_bases(supercell.get_cell(), symprec)
+
     for i in range(size_super): # run in supercell
         for j, s_j in enumerate(p2s_map): # run in primitive
             vectors = get_equivalent_smallest_vectors(i,
                                                       s_j,
-                                                      supercell, 
+                                                      supercell,
                                                       primitive.get_cell(),
+                                                      reduced_bases,
                                                       symprec)
             multiplicity[i][j] = len(vectors)
             for k, elem in enumerate(vectors):

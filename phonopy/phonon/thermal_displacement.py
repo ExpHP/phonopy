@@ -34,6 +34,7 @@
 
 import numpy as np
 from phonopy.units import AMU, THzToEv, Kb, EV, Hbar, Angstrom
+from phonopy.structure.cells import get_reduced_bases
 from phonopy.harmonic.dynamical_matrix import get_equivalent_smallest_vectors
 from phonopy.interface.cif import write_cif_P1
 # np.seterr(invalid='raise')
@@ -297,6 +298,7 @@ class ThermalDistances(ThermalMotion):
         self._supercell = supercell
         self._qpoints = qpoints
         self._symprec = symprec
+        self._reduced_bases = get_reduced_bases(supercell, symprec)
 
         ThermalMotion.__init__(self,
                                frequencies,
@@ -320,6 +322,7 @@ class ThermalDistances(ThermalMotion):
                                                       atom1,
                                                       self._supercell,
                                                       self._primitive.get_cell(),
+                                                      self._reduced_bases,
                                                       self._symprec)[0]
 
             self._project_eigenvectors(delta_r, self._primitive.get_cell())

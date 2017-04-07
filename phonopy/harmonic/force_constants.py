@@ -439,12 +439,13 @@ def rotational_invariance(force_constants,
 
     abc = "xyz"
 
+    reduced_bases = get_reduced_bases(supercell.get_cell(), symprec)
     for pi, p in enumerate(p2s):
         for i in range(3):
             mat = np.zeros((3, 3), dtype='double')
             for s in range(supercell.get_number_of_atoms()):
                 vecs = np.array(get_equivalent_smallest_vectors(
-                    s, p, supercell, primitive.get_cell(), symprec))
+                    s, p, supercell, primitive.get_cell(), reduced_bases, symprec))
                 m = len(vecs)
                 v = np.dot(vecs[:,:].sum(axis=0) / m, primitive.get_cell())
                 for j in range(3):
