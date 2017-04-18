@@ -598,6 +598,125 @@ static PyObject * py_distribute_fc2(PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+static void apply_sg_operation(double * rot_pos,
+                               const double * pos,
+                               const int num_pos,
+                               const int * r,
+                               const double * t)
+{
+  int i,j,k;
+  for (i = 0; i < num_pos; i++) {
+    for (j = 0; j < 3; j++) {
+      rot_pos[i * 3 + j] = t[j];
+      for (k = 0; k < 3; k++) {
+        rot_pos[i * 3 + j] += r[j * 3 + k] * pos[i * 3 + k];
+      }
+    }
+  }
+}
+
+static int compute_permutation(int * rot_atom,
+				  const double * lat,
+				  const double * pos,
+				  const double * rot_pos,
+				  const int num_pos,
+				  const double symprec)
+{
+  int i,j,k,l;
+  int is_found;
+  double distance2, symprec2, diff_cart;
+  double diff[3];
+
+  symprec2 = symprec * symprec;
+  for (i = 0; i < num_pos; i++) {
+    rot_atom[i] = -1;
+  }
+
+  for (i = 0; i < num_pos; i++) {
+    for (j = 0; j < num_pos; j++) {
+      for (k = 0; k < 3; k++) {
+        diff[k] = pos[j * 3 + k] - rot_pos[i * 3 + k];
+        diff[k] -= nint(diff[k]);
+      }
+      distance2 = 0;
+      for (k = 0; k < 3; k++) {
+        diff_cart = 0;
+        for (l = 0; l < 3; l++) {
+          diff_cart += lat[k * 3 + l] * diff[l];
+        }
+        distance2 += diff_cart * diff_cart;
+      }
+    
+      if (distance2 < symprec2) {
+          rot_atom[i] = j;
+          break;
+      }
+    }
+  }
+
+  is_found = 1;
+  for (i = 0; i < num_pos; i++) {
+    if (rot_atom[i] < 0) {
+      printf("Encounter some problem in distribute_fc2.\n");
+      is_found = 0;
+    }
+  }
+  return is_found;
+}
+
+static int compute_sg_permutation(int * rot_atom,
+				  const double * lat,
+				  const double * pos,
+				  const int num_pos,
+				  const int * r,
+				  const double * t,
+				  const double symprec)
+{
+  int is_found;
+  double * rot_pos;
+
+  rot_pos = (double *) malloc(3 * num_pos * sizeof(double));
+
+  apply_sg_operation(rot_pos, pos, num_pos, r, t);
+
+  is_found = compute_permutation(rot_atom, lat, pos, rot_pos, num_pos, symprec);
+
+  free(rot_pos);
+  return is_found;
+}
+
+
+static void distribute_fc2__phase2(double * fc2,
+				   const double * pos,
+				   const int num_pos,
+				   const int * rot_atom,
+				   const int atom_disp,
+				   const int map_atom_disp,
+				   const double * r_cart)
+{
+  int i,j,k,l,m;
+  int address_new, address;
+
+  for (i = 0; i < num_pos; i++) {
+    if (rot_atom[i] >= 0) {
+      /* R^-1 P R */
+      address = map_atom_disp * num_pos * 9 + rot_atom[i] * 9;
+      address_new = atom_disp * num_pos * 9 + i * 9;
+      for (j = 0; j < 3; j++) {
+        for (k = 0; k < 3; k++) {
+          for (l = 0; l < 3; l++) {
+            for (m = 0; m < 3; m++) {
+              fc2[address_new + j * 3 + k] +=
+                r_cart[l * 3 + j] * r_cart[m * 3 + k] *
+                fc2[address + l * 3 + m];
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 static int distribute_fc2(double * fc2,
 			  const double * lat,
 			  const double * pos,
@@ -609,66 +728,16 @@ static int distribute_fc2(double * fc2,
 			  const double * t,
 			  const double symprec)
 {
-  int i, j, k, l, m, address_new, address;
-  int is_found, rot_atom;
-  double distance2, symprec2, diff_cart;
-  double rot_pos[3], diff[3];
+  int is_found;
+  int * rot_atom;
 
-  symprec2 = symprec * symprec;
+  rot_atom = (int *) malloc(sizeof(int) * num_pos);
 
-  is_found = 1;
-  for (i = 0; i < num_pos; i++) {
-    for (j = 0; j < 3; j++) {
-      rot_pos[j] = t[j];
-      for (k = 0; k < 3; k++) {
-	rot_pos[j] += r[j * 3 + k] * pos[i * 3 + k];
-      }
-    }
+  is_found = compute_sg_permutation(rot_atom, lat, pos, num_pos, r, t, symprec);
 
-    rot_atom = -1;
-    for (j = 0; j < num_pos; j++) {
-      for (k = 0; k < 3; k++) {
-	diff[k] = pos[j * 3 + k] - rot_pos[k];
-	diff[k] -= nint(diff[k]);
-      }
-      distance2 = 0;
-      for (k = 0; k < 3; k++) {
-	diff_cart = 0;
-	for (l = 0; l < 3; l++) {
-	  diff_cart += lat[k * 3 + l] * diff[l];
-	}
-	distance2 += diff_cart * diff_cart;
-      }
+  distribute_fc2__phase2(fc2, pos, num_pos, rot_atom, atom_disp, map_atom_disp, r_cart);
 
-      if (distance2 < symprec2) {
-	  rot_atom = j;
-	  break;
-      }
-    }
-
-    if (rot_atom < 0) {
-      printf("Encounter some problem in distribute_fc2.\n");
-      is_found = 0;
-      goto end;
-    }
-
-    /* R^-1 P R */
-    address = map_atom_disp * num_pos * 9 + rot_atom * 9;
-    address_new = atom_disp * num_pos * 9 + i * 9;
-    for (j = 0; j < 3; j++) {
-      for (k = 0; k < 3; k++) {
-	for (l = 0; l < 3; l++) {
-	  for (m = 0; m < 3; m++) {
-	    fc2[address_new + j * 3 + k] +=
-	      r_cart[l * 3 + j] * r_cart[m * 3 + k] *
-	      fc2[address + l * 3 + m];
-	  }
-	}
-      }
-    }
-  end:
-    ;
-  }
+  free(rot_atom);
 
   return is_found;
 }
