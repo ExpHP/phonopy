@@ -658,20 +658,27 @@ def _distribute_fc2_part(force_constants,
     rot_cartesian = np.array(
         similarity_transformation(lattice, r), dtype='double', order='C')
 
+    rotated_positions = np.dot(positions, r.T) + t
+
     try:
         import phonopy._phonopy as phonoc
-        phonoc.distribute_fc2(force_constants,
-                              lattice,
-                              positions,
-                              atom_disp,
-                              map_atom_disp,
-                              rot_cartesian,
-                              np.array(r, dtype='intc', order='C'),
-                              np.array(t, dtype='double'),
-                              symprec)
+
+        permutation = np.zeros(shape=(len(positions),), dtype='intc')
+        phonoc.compute_permutation(permutation,
+                                   lattice,
+                                   positions,
+                                   rotated_positions,
+                                   symprec)
+
+        phonoc.distribute_fc2_with_perm(force_constants,
+                                        positions,
+                                        permutation,
+                                        atom_disp,
+                                        map_atom_disp,
+                                        rot_cartesian)
+
     except ImportError:
-        for i, pos_i in enumerate(positions):
-            rot_pos = np.dot(pos_i, r.T) + t
+        for i, rot_pos in enumerate(rotated_positions):
             rot_atom = -1
             for j, pos_j in enumerate(positions):
                 diff = pos_j - rot_pos
