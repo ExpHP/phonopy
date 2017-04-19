@@ -49,6 +49,8 @@ static PyObject * py_get_nac_dynamical_matrix(PyObject *self, PyObject *args);
 static PyObject * py_get_derivative_dynmat(PyObject *self, PyObject *args);
 static PyObject * py_get_thermal_properties(PyObject *self, PyObject *args);
 static PyObject * py_distribute_fc2(PyObject *self, PyObject *args);
+static PyObject * py_distribute_fc2_with_perm(PyObject *self, PyObject *args);
+static PyObject * py_compute_permutation(PyObject *self, PyObject *args);
 
 static int distribute_fc2(double * fc2,
 			  const double * lat,
@@ -60,6 +62,22 @@ static int distribute_fc2(double * fc2,
 			  const int * r,
 			  const double * t,
 			  const double symprec);
+
+static void distribute_fc2_with_perm(double * fc2,
+				   const double * pos,
+				   const int num_pos,
+				   const int * rot_atom,
+				   const int atom_disp,
+				   const int map_atom_disp,
+				   const double * r_cart);
+
+static int compute_permutation(int * rot_atom,
+				  const double * lat,
+				  const double * pos,
+				  const double * rot_pos,
+				  const int num_pos,
+				  const double symprec);
+
 static PyObject * py_thm_neighboring_grid_points(PyObject *self, PyObject *args);
 static PyObject *
 py_thm_relative_grid_address(PyObject *self, PyObject *args);
@@ -106,6 +124,10 @@ static PyMethodDef _phonopy_methods[] = {
   {"derivative_dynmat", py_get_derivative_dynmat, METH_VARARGS, "Q derivative of dynamical matrix"},
   {"thermal_properties", py_get_thermal_properties, METH_VARARGS, "Thermal properties"},
   {"distribute_fc2", py_distribute_fc2, METH_VARARGS, "Distribute force constants"},
+  {"distribute_fc2_with_perm", py_distribute_fc2_with_perm, METH_VARARGS,
+   "Distribute force constants with known permutation"},
+  {"compute_permutation", py_compute_permutation, METH_VARARGS,
+   "Compute indices of original points in a set of rotated points."},
   {"neighboring_grid_points", py_thm_neighboring_grid_points,
    METH_VARARGS, "Neighboring grid points by relative grid addresses"},
   {"tetrahedra_relative_grid_address", py_thm_relative_grid_address,
@@ -598,6 +620,86 @@ static PyObject * py_distribute_fc2(PyObject *self, PyObject *args)
   Py_RETURN_NONE;
 }
 
+static PyObject * py_distribute_fc2_with_perm(PyObject *self, PyObject *args)
+{
+  PyArrayObject* force_constants;
+  PyArrayObject* positions;
+  PyArrayObject* permutation;
+  PyArrayObject* rotation_cart;
+  int atom_disp, map_atom_disp;
+
+  int* rot_atoms;
+  double* r_cart;
+  double* fc2;
+  double* pos;
+  int num_pos;
+
+  if (!PyArg_ParseTuple(args, "OOOiiO",
+			&force_constants,
+			&positions,
+			&permutation,
+			&atom_disp,
+			&map_atom_disp,
+			&rotation_cart)) {
+    return NULL;
+  }
+
+  rot_atoms = (int*)PyArray_DATA(permutation);
+  r_cart = (double*)PyArray_DATA(rotation_cart);
+  fc2 = (double*)PyArray_DATA(force_constants);
+  pos = (double*)PyArray_DATA(positions);
+  num_pos = PyArray_DIMS(positions)[0];
+
+  distribute_fc2_with_perm(fc2,
+		 pos,
+		 num_pos,
+		 rot_atoms,
+		 atom_disp,
+		 map_atom_disp,
+		 r_cart);
+
+  Py_RETURN_NONE;
+}
+
+static PyObject * py_compute_permutation(PyObject *self, PyObject *args)
+{
+  PyArrayObject* permutation;
+  PyArrayObject* lattice;
+  PyArrayObject* positions;
+  PyArrayObject* permuted_positions;
+  double symprec;
+
+  int* rot_atoms;
+  double* lat;
+  double* pos;
+  double* rot_pos;
+  int num_pos;
+
+  if (!PyArg_ParseTuple(args, "OOOOd",
+			&permutation,
+			&lattice,
+			&positions,
+			&permuted_positions,
+			&symprec)) {
+    return NULL;
+  }
+
+  rot_atoms = (int*)PyArray_DATA(permutation);
+  lat = (double*)PyArray_DATA(lattice);
+  pos = (double*)PyArray_DATA(positions);
+  rot_pos = (double*)PyArray_DATA(permuted_positions);
+  num_pos = PyArray_DIMS(positions)[0];
+
+  compute_permutation(rot_atoms,
+				  lat,
+				  pos,
+				  rot_pos,
+				  num_pos,
+				  symprec);
+
+  Py_RETURN_NONE;
+}
+
 static void apply_sg_operation(double * rot_pos,
                                const double * pos,
                                const int num_pos,
@@ -685,8 +787,7 @@ static int compute_sg_permutation(int * rot_atom,
   return is_found;
 }
 
-
-static void distribute_fc2__phase2(double * fc2,
+static void distribute_fc2_with_perm(double * fc2,
 				   const double * pos,
 				   const int num_pos,
 				   const int * rot_atom,
@@ -735,7 +836,7 @@ static int distribute_fc2(double * fc2,
 
   is_found = compute_sg_permutation(rot_atom, lat, pos, num_pos, r, t, symprec);
 
-  distribute_fc2__phase2(fc2, pos, num_pos, rot_atom, atom_disp, map_atom_disp, r_cart);
+  distribute_fc2_with_perm(fc2, pos, num_pos, rot_atom, atom_disp, map_atom_disp, r_cart);
 
   free(rot_atom);
 
