@@ -660,50 +660,77 @@ def _distribute_fc2_part(force_constants,
 
     rotated_positions = np.dot(positions, r.T) + t
 
+    permutation = _compute_permutation(positions,
+                                       rotated_positions,
+                                       lattice,
+                                       symprec)
+
+    _distribute_fc2_part_with_perm(force_constants,
+                                   positions,
+                                   permutation,
+                                   atom_disp,
+                                   map_atom_disp,
+                                   rot_cartesian)
+
+
+# Get the overall permutation such that
+#
+#        positions[permutation] == rotated_positions   (modulo the lattice)
+#
+def _compute_permutation(positions,
+                         rotated_positions,
+                         lattice, # column vectors
+                         symprec):
+
+    # Sort both sides by some measure which is likely to produce a small
+    # maximum value of (sorted_rotated_index - sorted_original_index).
+    # The C code is optimized for this case, reducing an O(n^2)
+    # search down to ~O(n). (for O(n log n) work overall, including the sort)
+    #
+    # We choose distance from the nearest bravais lattice point as our measure.
+    def sort_by_lattice_distance(fracs):
+        carts = np.dot(fracs - np.rint(fracs), lattice.T)
+        perm = np.argsort(np.sum(carts**2, axis=1))
+        sorted_fracs = fracs[perm]
+        return perm, sorted_fracs
+
+    (pos_perm, sorted_pos) = sort_by_lattice_distance(positions)
+    (rot_perm, sorted_rot) = sort_by_lattice_distance(rotated_positions)
+
+    # Call the C code on our conditioned inputs.
+    between_perm = _compute_permutation_c(sorted_pos,
+                                          sorted_rot,
+                                          lattice,
+                                          symprec)
+
+    # Compose all of the permutations for the full permutation.
+    #
+    # Note the following properties of permutation arrays:
+    #
+    # 1. Inverse:         if  x[perm] == y  then  x == y[argsort(perm)]
+    # 2. Associativity:   x[p][q] == x[p[q]]
+    return pos_perm[between_perm][np.argsort(rot_perm)]
+
+# Version of _compute_permutation which just directly calls the C function.
+# May be slow for large and ill-conditioned data sets.
+def _compute_permutation_c(positions,
+                           rotated_positions,
+                           lattice, # column vectors
+                           symprec):
+
+    between_perm = np.zeros(shape=(len(positions),), dtype='intc')
+
     try:
         import phonopy._phonopy as phonoc
-
-        # Sort both sides by some measure which is likely to produce a small
-        # maximum value of (sorted_rotated_index - sorted_original_index).
-        #
-        # compute_permutation is optimized for this case, reducing an O(n^2)
-        # search down to ~O(n).
-        #
-        # We choose distance from the nearest bravais lattice point.
-        def sort_by_lattice_distance(fracs):
-            carts = np.dot(fracs - np.rint(fracs), lattice.T)
-            perm = np.argsort(np.sum(carts**2, axis=1))
-            sorted_fracs = fracs[perm]
-            return perm, sorted_fracs
-
-        (pos_perm, sorted_pos) = sort_by_lattice_distance(positions)
-        (rot_perm, sorted_rot) = sort_by_lattice_distance(rotated_positions)
-
-        between_perm = np.zeros(shape=(len(positions),), dtype='intc')
         phonoc.compute_permutation(between_perm,
                                    lattice,
-                                   sorted_pos,
-                                   sorted_rot,
+                                   positions,
+                                   rotated_positions,
                                    symprec)
 
-        # Get the overall permutation such that
-        #
-        #          positions[permutation] == rotated_positions
-        #
-        # Note the following properties of permutation arrays:
-        #
-        # 1. Inverse:         if  x[perm] == y  then  x == y[argsort(perm)]
-        # 2. Associativity:   x[p][q] == x[p[q]]
-        permutation = pos_perm[between_perm][np.argsort(rot_perm)]
-
-        phonoc.distribute_fc2_with_perm(force_constants,
-                                        positions,
-                                        np.array(permutation, dtype='intc'),
-                                        atom_disp,
-                                        map_atom_disp,
-                                        rot_cartesian)
-
     except ImportError:
+        between_perm[:] = -1
+
         for i, rot_pos in enumerate(rotated_positions):
             rot_atom = -1
             for j, pos_j in enumerate(positions):
@@ -718,6 +745,31 @@ def _distribute_fc2_part(force_constants,
                 print("Input forces are not enough to calculate force constants,")
                 print("or something wrong (e.g. crystal structure does not match).")
                 raise ValueError
+
+            between_perm[i] = rot_atom
+
+    return between_perm
+
+
+def _distribute_fc2_part_with_perm(force_constants,
+                                   positions,
+                                   permutation,
+                                   atom_disp,
+                                   map_atom_disp,
+                                   rot_cartesian):
+
+    try:
+        import phonopy._phonopy as phonoc
+
+        phonoc.distribute_fc2_with_perm(force_constants,
+                                        positions,
+                                        np.array(permutation, dtype='intc'),
+                                        atom_disp,
+                                        map_atom_disp,
+                                        rot_cartesian)
+
+    except ImportError:
+        for i, rot_atom in enumerate(permutation):
 
             # R^-1 P R (inverse transformation)
             force_constants[atom_disp, i] += similarity_transformation(
