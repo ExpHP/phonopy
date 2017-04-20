@@ -720,13 +720,22 @@ def _compute_permutation_c(positions,
 
     between_perm = np.zeros(shape=(len(positions),), dtype='intc')
 
+    def permutation_error():
+        print("Input forces are not enough to calculate force constants,", file=sys.stderr)
+        print("or something wrong (e.g. crystal structure does not match).", file=sys.stderr)
+        raise ValueError
+
     try:
         import phonopy._phonopy as phonoc
-        phonoc.compute_permutation(between_perm,
-                                   lattice,
-                                   positions,
-                                   rotated_positions,
-                                   symprec)
+        is_found = phonoc.compute_permutation(between_perm,
+                                              lattice,
+                                              positions,
+                                              rotated_positions,
+                                              symprec)
+
+        if not is_found:
+            permutation_error()
+
 
     except ImportError:
         between_perm[:] = -1
@@ -742,9 +751,7 @@ def _compute_permutation_c(positions,
                     break
 
             if rot_atom < 0:
-                print("Input forces are not enough to calculate force constants,")
-                print("or something wrong (e.g. crystal structure does not match).")
-                raise ValueError
+                permutation_error()
 
             between_perm[i] = rot_atom
 
