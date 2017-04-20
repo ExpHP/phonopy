@@ -123,7 +123,8 @@ static PyMethodDef _phonopy_methods[] = {
   {"nac_dynamical_matrix", py_get_nac_dynamical_matrix, METH_VARARGS, "NAC dynamical matrix"},
   {"derivative_dynmat", py_get_derivative_dynmat, METH_VARARGS, "Q derivative of dynamical matrix"},
   {"thermal_properties", py_get_thermal_properties, METH_VARARGS, "Thermal properties"},
-  {"distribute_fc2", py_distribute_fc2, METH_VARARGS, "Distribute force constants"},
+  {"distribute_fc2", py_distribute_fc2, METH_VARARGS,
+   "Distribute force constants. Legacy function no longer used by phonopy (see compute_permutation, distribute_fc2_with_perm)."},
   {"distribute_fc2_with_perm", py_distribute_fc2_with_perm, METH_VARARGS,
    "Distribute force constants with known permutation"},
   {"compute_permutation", py_compute_permutation, METH_VARARGS,
@@ -566,6 +567,7 @@ static double get_heat_capacity_omega(const double temperature,
 /* } */
 
 
+// NOTE: Legacy function.
 static PyObject * py_distribute_fc2(PyObject *self, PyObject *args)
 {
   PyArrayObject* force_constants;
@@ -778,6 +780,7 @@ static int compute_permutation(int * rot_atom,
   return 1;
 }
 
+// NOTE: Legacy code for distribute_fc2.
 static int compute_sg_permutation(int * rot_atom,
 				  const double * lat,
 				  const double * pos,
@@ -830,6 +833,7 @@ static void distribute_fc2_with_perm(double * fc2,
   }
 }
 
+// NOTE: Legacy function.
 static int distribute_fc2(double * fc2,
 			  const double * lat,
 			  const double * pos,
