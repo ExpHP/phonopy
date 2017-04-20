@@ -726,6 +726,7 @@ static int compute_permutation(int * rot_atom,
 {
   int i,j,k,l;
   int is_found;
+  int search_start;
   double distance2, symprec2, diff_cart;
   double diff[3];
 
@@ -734,10 +735,23 @@ static int compute_permutation(int * rot_atom,
     rot_atom[i] = -1;
   }
 
+  // optimization: Iterate primarily by pos instead of rot_pos.
+  //  (find where 0 belongs in rot_atom, then where 1 belongs, etc.)
+  //  Then track the first unassigned index.
+  // This works best if the permutation is close to the identity.
+  // (more specifically, if the max value of 'rot_atom[i] - i' is small)
+  search_start = 0;
   for (i = 0; i < num_pos; i++) {
-    for (j = 0; j < num_pos; j++) {
+    while (rot_atom[search_start] >= 0) {
+      search_start++;
+    }
+    for (j = search_start; j < num_pos; j++) {
+      if (rot_atom[j] >= 0) {
+        continue;
+      }
+
       for (k = 0; k < 3; k++) {
-        diff[k] = pos[j * 3 + k] - rot_pos[i * 3 + k];
+        diff[k] = pos[i * 3 + k] - rot_pos[j * 3 + k];
         diff[k] -= nint(diff[k]);
       }
       distance2 = 0;
@@ -750,7 +764,7 @@ static int compute_permutation(int * rot_atom,
       }
     
       if (distance2 < symprec2) {
-          rot_atom[i] = j;
+          rot_atom[j] = i;
           break;
       }
     }
