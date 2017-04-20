@@ -690,14 +690,14 @@ static PyObject * py_compute_permutation(PyObject *self, PyObject *args)
   rot_pos = (double*)PyArray_DATA(permuted_positions);
   num_pos = PyArray_DIMS(positions)[0];
 
-  compute_permutation(rot_atoms,
-				  lat,
-				  pos,
-				  rot_pos,
-				  num_pos,
-				  symprec);
+  int is_found = compute_permutation(rot_atoms,
+				     lat,
+				     pos,
+				     rot_pos,
+				     num_pos,
+				     symprec);
 
-  Py_RETURN_NONE;
+  return Py_BuildValue("i", is_found);
 }
 
 static void apply_sg_operation(double * rot_pos,
@@ -725,7 +725,6 @@ static int compute_permutation(int * rot_atom,
 				  const double symprec)
 {
   int i,j,k,l;
-  int is_found;
   int search_start;
   double distance2, symprec2, diff_cart;
   double diff[3];
@@ -770,14 +769,13 @@ static int compute_permutation(int * rot_atom,
     }
   }
 
-  is_found = 1;
   for (i = 0; i < num_pos; i++) {
     if (rot_atom[i] < 0) {
       printf("Encounter some problem in distribute_fc2.\n");
-      is_found = 0;
+      return 0;
     }
   }
-  return is_found;
+  return 1;
 }
 
 static int compute_sg_permutation(int * rot_atom,
