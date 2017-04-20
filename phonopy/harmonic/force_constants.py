@@ -663,16 +663,42 @@ def _distribute_fc2_part(force_constants,
     try:
         import phonopy._phonopy as phonoc
 
-        permutation = np.zeros(shape=(len(positions),), dtype='intc')
-        phonoc.compute_permutation(permutation,
+        # Sort both sides by some measure which is likely to produce a small
+        # maximum value of (sorted_rotated_index - sorted_original_index).
+        #
+        # compute_permutation is optimized for this case, reducing an O(n^2)
+        # search down to ~O(n).
+        #
+        # We choose distance from the nearest bravais lattice point.
+        def sort_by_lattice_distance(fracs):
+            carts = np.dot(fracs - np.rint(fracs), lattice.T)
+            perm = np.argsort(np.sum(carts**2, axis=1))
+            sorted_fracs = fracs[perm]
+            return perm, sorted_fracs
+
+        (pos_perm, sorted_pos) = sort_by_lattice_distance(positions)
+        (rot_perm, sorted_rot) = sort_by_lattice_distance(rotated_positions)
+
+        between_perm = np.zeros(shape=(len(positions),), dtype='intc')
+        phonoc.compute_permutation(between_perm,
                                    lattice,
-                                   positions,
-                                   rotated_positions,
+                                   sorted_pos,
+                                   sorted_rot,
                                    symprec)
+
+        # Get the overall permutation such that
+        #
+        #          positions[permutation] == rotated_positions
+        #
+        # Note the following properties of permutation arrays:
+        #
+        # 1. Inverse:         if  x[perm] == y  then  x == y[argsort(perm)]
+        # 2. Associativity:   x[p][q] == x[p[q]]
+        permutation = pos_perm[between_perm][np.argsort(rot_perm)]
 
         phonoc.distribute_fc2_with_perm(force_constants,
                                         positions,
-                                        permutation,
+                                        np.array(permutation, dtype='intc'),
                                         atom_disp,
                                         map_atom_disp,
                                         rot_cartesian)
