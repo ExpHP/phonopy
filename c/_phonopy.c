@@ -64,7 +64,6 @@ static int distribute_fc2(double * fc2,
 			  const double symprec);
 
 static void distribute_fc2_with_perm(double * fc2,
-				   const double * pos,
 				   const int num_pos,
 				   const int * rot_atom,
 				   const int atom_disp,
@@ -625,7 +624,6 @@ static PyObject * py_distribute_fc2(PyObject *self, PyObject *args)
 static PyObject * py_distribute_fc2_with_perm(PyObject *self, PyObject *args)
 {
   PyArrayObject* force_constants;
-  PyArrayObject* positions;
   PyArrayObject* permutation;
   PyArrayObject* rotation_cart;
   int atom_disp, map_atom_disp;
@@ -633,12 +631,10 @@ static PyObject * py_distribute_fc2_with_perm(PyObject *self, PyObject *args)
   int* rot_atoms;
   double* r_cart;
   double* fc2;
-  double* pos;
   int num_pos;
 
-  if (!PyArg_ParseTuple(args, "OOOiiO",
+  if (!PyArg_ParseTuple(args, "OOiiO",
 			&force_constants,
-			&positions,
 			&permutation,
 			&atom_disp,
 			&map_atom_disp,
@@ -649,11 +645,9 @@ static PyObject * py_distribute_fc2_with_perm(PyObject *self, PyObject *args)
   rot_atoms = (int*)PyArray_DATA(permutation);
   r_cart = (double*)PyArray_DATA(rotation_cart);
   fc2 = (double*)PyArray_DATA(force_constants);
-  pos = (double*)PyArray_DATA(positions);
-  num_pos = PyArray_DIMS(positions)[0];
+  num_pos = PyArray_DIMS(permutation)[0];
 
   distribute_fc2_with_perm(fc2,
-		 pos,
 		 num_pos,
 		 rot_atoms,
 		 atom_disp,
@@ -803,7 +797,6 @@ static int compute_sg_permutation(int * rot_atom,
 }
 
 static void distribute_fc2_with_perm(double * fc2,
-				   const double * pos,
 				   const int num_pos,
 				   const int * rot_atom,
 				   const int atom_disp,
@@ -852,7 +845,7 @@ static int distribute_fc2(double * fc2,
 
   is_found = compute_sg_permutation(rot_atom, lat, pos, num_pos, r, t, symprec);
 
-  distribute_fc2_with_perm(fc2, pos, num_pos, rot_atom, atom_disp, map_atom_disp, r_cart);
+  distribute_fc2_with_perm(fc2, num_pos, rot_atom, atom_disp, map_atom_disp, r_cart);
 
   free(rot_atom);
 

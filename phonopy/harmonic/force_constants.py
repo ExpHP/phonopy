@@ -666,7 +666,6 @@ def _distribute_fc2_part(force_constants,
                                        symprec)
 
     _distribute_fc2_part_with_perm(force_constants,
-                                   positions,
                                    permutation,
                                    atom_disp,
                                    map_atom_disp,
@@ -712,7 +711,7 @@ def _compute_permutation(positions,
     return pos_perm[between_perm][np.argsort(rot_perm)]
 
 # Version of _compute_permutation which just directly calls the C function.
-# May be slow for large and ill-conditioned data sets.
+# May be slow for large, ill-conditioned data sets.
 def _compute_permutation_c(positions,
                            rotated_positions,
                            lattice, # column vectors
@@ -756,8 +755,8 @@ def _compute_permutation_c(positions,
     return permutation
 
 
+# Add R^-1 P R for a rotation with a known permutation.
 def _distribute_fc2_part_with_perm(force_constants,
-                                   positions,
                                    permutation,
                                    atom_disp,
                                    map_atom_disp,
@@ -767,7 +766,6 @@ def _distribute_fc2_part_with_perm(force_constants,
         import phonopy._phonopy as phonoc
 
         phonoc.distribute_fc2_with_perm(force_constants,
-                                        positions,
                                         np.array(permutation, dtype='intc'),
                                         atom_disp,
                                         map_atom_disp,
