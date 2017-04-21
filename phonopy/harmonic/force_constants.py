@@ -868,11 +868,13 @@ def _get_atom_mapping_by_symmetry(atom_list_done,
 
     for i, (r, t) in enumerate(zip(rotations, translations)):
         rot_pos = np.dot(positions[atom_number], r.T) + t
-        for j in atom_list_done:
-            diff = positions[j] - rot_pos
-            diff -= np.rint(diff)
-            if np.linalg.norm(np.dot(diff, lattice.T)) < symprec:
-                return j, i
+
+        diffs = positions[atom_list_done] - rot_pos
+        diffs -= np.rint(diffs)
+        diffs = np.dot(diffs, lattice.T)
+        possibilities = atom_list_done[np.sum(diffs**2, axis=1) < symprec**2]
+        if len(possibilities): # explicit len because np.array([0]) is false
+            return possibilities[0], i
 
     print("Input forces are not enough to calculate force constants,")
     print("or something wrong (e.g. crystal structure does not match).")
