@@ -33,7 +33,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-from phonopy.structure.cells import get_reduced_bases
 
 def get_dynamical_matrix(fc2,
                          supercell,
@@ -66,7 +65,7 @@ def get_dynamical_matrix(fc2,
 
 class DynamicalMatrix(object):
     """Dynamical matrix class
-    
+
     When prmitive and supercell lattices are L_p and L_s, respectively,
     frame F is defined by
     L_p = dot(F, L_s), then L_s = dot(F^-1, L_p).
@@ -74,7 +73,7 @@ class DynamicalMatrix(object):
         [ a1 a2 a3 ]
     L = [ b1 b2 b3 ]
         [ c1 c2 c3 ]
-    
+
     Phase difference in primitive cell unit
     between atoms 1 and 2 in supercell is calculated by, e.g.,
     1j * dot((x_s(2) - x_s(1)), F^-1) * 2pi
@@ -113,7 +112,7 @@ class DynamicalMatrix(object):
 
     def get_decimals(self):
         return self._decimals
-    
+
     def get_supercell(self):
         return self._scell
 
@@ -160,8 +159,8 @@ class DynamicalMatrix(object):
             for j, s_j in enumerate(self._p2s_map):
                 mass = np.sqrt(self._mass[i] * self._mass[j])
                 dm_local = np.zeros((3, 3), dtype=complex)
-                # Sum in lattice points                
-                for k in range(self._scell.get_number_of_atoms()): 
+                # Sum in lattice points
+                for k in range(self._scell.get_number_of_atoms()):
                     if s_j == self._s2p_map[k]:
                         multi = multiplicity[k][i]
                         phase = []
@@ -174,7 +173,7 @@ class DynamicalMatrix(object):
                 dm[(i*3):(i*3+3), (j*3):(j*3+3)] += dm_local
 
         # Impose Hermisian condition
-        self._dynamical_matrix = (dm + dm.conj().transpose()) / 2 
+        self._dynamical_matrix = (dm + dm.conj().transpose()) / 2
 
         if verbose:
             self._dynamical_matrix_log()
@@ -188,7 +187,7 @@ class DynamicalMatrix(object):
                     re = vec.real
                     im = vec.imag
                     print("dynamical matrix(%3d - %3d) "
-                          "%10.5f %10.5f %10.5f %10.5f %10.5f %10.5f" % 
+                          "%10.5f %10.5f %10.5f %10.5f %10.5f %10.5f" %
                           (i+1, j+1, re[0], im[0], re[1], im[1], re[2], im[2]))
                 print('')
 
@@ -196,7 +195,7 @@ class DynamicalMatrix(object):
         r = self._smallest_vectors
         m = self._multiplicity
 
-        print("#%4s %4s %4s %4s %4s %10s" % 
+        print("#%4s %4s %4s %4s %4s %10s" %
               ("p_i", "p_j", "s_i", "s_j", "mult", "dist"))
         for p_i, s_i in enumerate(self._p2s_map): # run in primitive
             for s_j in range(r.shape[0]): # run in supercell
@@ -261,7 +260,7 @@ class DynamicalMatrixNAC(DynamicalMatrix):
 
     def get_dielectric_constant(self):
         return self._dielectric
-    
+
     def set_nac_params(self, nac_params):
         self._born = np.array(nac_params['born'], dtype='double', order='C')
         self._unit_conversion = nac_params['factor']
@@ -282,7 +281,7 @@ class DynamicalMatrixNAC(DynamicalMatrix):
             self._force_constants = self._bare_force_constants.copy()
             DynamicalMatrix.set_dynamical_matrix(self, q_red, verbose)
             return False
-    
+
         volume = self._pcell.get_volume()
         constant = (self._unit_conversion * 4.0 * np.pi / volume
                     / np.dot(q, np.dot(self._dielectric, q)))
@@ -315,7 +314,7 @@ class DynamicalMatrixNAC(DynamicalMatrix):
             if s1 != self._s2p_map[s1]:
                 continue
             p1 = self._p2p_map[s1]
-            for s2 in range(self._scell.get_number_of_atoms()):            
+            for s2 in range(self._scell.get_number_of_atoms()):
                 p2 = self._p2p_map[s2]
                 fc[s1, s2] += nac_q[p1, p2] / N
 
@@ -359,16 +358,18 @@ def get_equivalent_smallest_vectors(atom_number_supercell,
                                     atom_number_primitive,
                                     supercell,
                                     primitive_lattice,
+                                    reduced_bases,
                                     symprec):
-    reduced_bases = get_reduced_bases(supercell.get_cell(), symprec)
-    positions = np.dot(supercell.get_positions(), np.linalg.inv(reduced_bases))
+    reduced_bases = supercell.get_reduced_bases()
+    positions = np.dot(supercell.get_positions(),
+                       supercell.get_reduced_bases_inv())
 
     # Atomic positions are confined into the lattice made of reduced bases.
     positions -= np.rint(positions)
 
     p_pos = positions[atom_number_primitive]
     s_pos = positions[atom_number_supercell]
-    
+
     # The vector arrow is from the atom in primitive to
     # the atom in supercell cell plus a supercell lattice
     # point. This is related to determine the phase
@@ -378,18 +379,14 @@ def get_equivalent_smallest_vectors(atom_number_supercell,
                   for j in (-1, 0, 1)
                   for k in (-1, 0, 1)
     ])
-    
+
     differences = s_pos + supercell_vectors - p_pos
-    distances = np.sqrt((np.dot(differences, reduced_bases) ** 2).sum(axis=1))
-    minimum = min(distances)
-    smallest_vectors = []
-    for i in range(27):
-        if abs(minimum - distances[i]) < symprec:
-            relative_scale = np.dot(reduced_bases,
-                                    np.linalg.inv(primitive_lattice))
-            smallest_vectors.append(np.dot(differences[i], relative_scale))
-            
-    return smallest_vectors
+    distances = np.sum(np.dot(differences, reduced_bases)**2, axis=1)
+
+    differences = differences[distances - distances.min() < symprec**2]
+
+    relative_scale = reduced_bases.dot(np.linalg.inv(primitive_lattice))
+    return differences.dot(relative_scale)
 
 def get_smallest_vectors(supercell, primitive, symprec):
     """
@@ -402,7 +399,7 @@ def get_smallest_vectors(supercell, primitive, symprec):
       directions, several shortest vectors are stored. The
       multiplicity is stored in another array, "multiplicity".
       [atom_super, atom_primitive, multiple-vectors, 3]
-      
+
     multiplicity:
       Number of multiple shortest vectors (third index of "shortest_vectors")
       [atom_super, atom_primitive]
@@ -414,16 +411,18 @@ def get_smallest_vectors(supercell, primitive, symprec):
     shortest_vectors = np.zeros((size_super, size_prim, 27, 3), dtype='double')
     multiplicity = np.zeros((size_super, size_prim), dtype='intc')
 
+    reduced_bases = supercell.get_reduced_bases()
+
     for i in range(size_super): # run in supercell
         for j, s_j in enumerate(p2s_map): # run in primitive
             vectors = get_equivalent_smallest_vectors(i,
                                                       s_j,
-                                                      supercell, 
+                                                      supercell,
                                                       primitive.get_cell(),
+                                                      reduced_bases,
                                                       symprec)
             multiplicity[i][j] = len(vectors)
             for k, elem in enumerate(vectors):
                 shortest_vectors[i][j][k] = elem
 
     return shortest_vectors, multiplicity
-
