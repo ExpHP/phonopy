@@ -718,7 +718,7 @@ def _compute_permutation_c(positions,
                            lattice, # column vectors
                            symprec):
 
-    between_perm = np.zeros(shape=(len(positions),), dtype='intc')
+    permutation = np.zeros(shape=(len(positions),), dtype='intc')
 
     def permutation_error():
         print("Input forces are not enough to calculate force constants,", file=sys.stderr)
@@ -727,7 +727,7 @@ def _compute_permutation_c(positions,
 
     try:
         import phonopy._phonopy as phonoc
-        is_found = phonoc.compute_permutation(between_perm,
+        is_found = phonoc.compute_permutation(permutation,
                                               lattice,
                                               positions,
                                               rotated_positions,
@@ -736,26 +736,24 @@ def _compute_permutation_c(positions,
         if not is_found:
             permutation_error()
 
-
     except ImportError:
-        between_perm[:] = -1
+        symprec2 = symprec**2
 
         for i, rot_pos in enumerate(rotated_positions):
-            rot_atom = -1
-            for j, pos_j in enumerate(positions):
-                diff = pos_j - rot_pos
-                diff -= np.rint(diff)
-                diff = np.dot(diff, lattice.T)
-                if np.linalg.norm(diff) < symprec:
-                    rot_atom = j
-                    break
+            diffs = positions - rot_pos
+            diffs -= np.rint(diffs)
+            diffs = np.dot(diffs, lattice.T)
 
-            if rot_atom < 0:
+            possible_j = np.nonzero(np.sum(diffs**2, axis=1) < symprec2)[0]
+            if len(possible_j) != 1:
                 permutation_error()
 
-            between_perm[i] = rot_atom
+            permutation[i] = possible_j[0]
 
-    return between_perm
+        if -1 in permutation:
+            permutation_error()
+
+    return permutation
 
 
 def _distribute_fc2_part_with_perm(force_constants,
