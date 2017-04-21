@@ -153,6 +153,8 @@ class Supercell(Atoms):
         self._s2u_map = None
         self._u2s_map = None
         self._u2u_map = None
+        self._reduced_bases = None
+        self._reduced_bases_inv = None
         self._supercell_matrix = np.array(supercell_matrix, dtype='intc')
         self._create_supercell(unitcell, symprec)
 
@@ -167,6 +169,12 @@ class Supercell(Atoms):
 
     def get_unitcell_to_unitcell_map(self):
         return self._u2u_map
+
+    def get_reduced_bases(self):
+        return self._reduced_bases
+
+    def get_reduced_bases_inv(self):
+        return self._reduced_bases_inv
 
     def _create_supercell(self, unitcell, symprec):
         mat = self._supercell_matrix
@@ -200,6 +208,8 @@ class Supercell(Atoms):
             self._u2s_map = np.arange(unitcell.get_number_of_atoms()) * multi
             self._u2u_map = dict([(j, i) for i, j in enumerate(self._u2s_map)])
             self._s2u_map = np.array(u2sur_map)[sur2s_map] * multi
+            self._reduced_bases = get_reduced_bases(self.get_cell(), symprec)
+            self._reduced_bases_inv = np.linalg.inv(self._reduced_bases)
 
     def _get_surrounding_frame(self, supercell_matrix):
         # Build a frame surrounding supercell lattice

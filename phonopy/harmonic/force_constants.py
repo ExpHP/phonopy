@@ -34,7 +34,6 @@
 
 import numpy as np
 import sys
-from phonopy.structure.cells import get_reduced_bases
 from phonopy.harmonic.dynamical_matrix import get_equivalent_smallest_vectors
 
 def get_force_constants(set_of_forces,
@@ -122,9 +121,9 @@ def cutoff_force_constants(force_constants,
                            cutoff_radius,
                            symprec=1e-5):
     num_atom = supercell.get_number_of_atoms()
-    reduced_bases = get_reduced_bases(supercell.get_cell(), symprec)
+    reduced_bases = supercell.get_reduced_bases()
     positions = np.dot(supercell.get_positions(),
-                       np.linalg.inv(reduced_bases))
+                       supercell.get_reduced_bases_inv())
     for i in range(num_atom):
         pos_i = positions[i]
         for j in range(num_atom):
