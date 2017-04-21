@@ -645,6 +645,31 @@ def _get_force_constants_disps(force_constants,
 
     return disp_atom_list
 
+# runs the old distribute_fc2 function, for testing purposes
+def _distribute_fc2_part_old(force_constants,
+                             positions,
+                             atom_disp,
+                             map_atom_disp,
+                             lattice, # column vectors
+                             r,
+                             t,
+                             symprec):
+
+    rot_cartesian = np.array(
+        similarity_transformation(lattice, r), dtype='double', order='C')
+
+    import phonopy._phonopy as phonoc
+    phonoc.distribute_fc2(force_constants,
+                          lattice,
+                          positions,
+                          atom_disp,
+                          map_atom_disp,
+                          rot_cartesian,
+                          np.array(r, dtype='intc', order='C'),
+                          np.array(t, dtype='double'),
+                          symprec)
+
+
 def _distribute_fc2_part(force_constants,
                          positions,
                          atom_disp,
