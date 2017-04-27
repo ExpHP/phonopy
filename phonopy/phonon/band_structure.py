@@ -161,6 +161,9 @@ class BandStructure(object):
             text.append('')
             w.write("\n".join(text))
 
+            if self._eigenvectors is not None:
+                np.save('eigenvector.npy', self._eigenvectors)
+                return
             for i in range(len(self._paths)):
                 qpoints = self._paths[i]
                 distances = self._distances[i]
