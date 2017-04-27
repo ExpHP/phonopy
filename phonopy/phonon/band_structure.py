@@ -178,53 +178,56 @@ class BandStructure(object):
                     if len(labels) == len(self._paths) + 1:
                         _labels = (labels[i], labels[i + 1])
 
-                w.write("\n".join(self._get_q_segment_yaml(qpoints,
-                                                           distances,
-                                                           frequencies,
-                                                           eigenvectors,
-                                                           group_velocities,
-                                                           _labels)))
+                def callback(line):
+                    w.write(line)
+                    w.write("\n")
 
-    def _get_q_segment_yaml(self,
-                            qpoints,
-                            distances,
-                            frequencies,
-                            eigenvectors,
-                            group_velocities,
-                            labels):
+                self._do_q_segment_yaml(callback,
+                                        qpoints,
+                                        distances,
+                                        frequencies,
+                                        eigenvectors,
+                                        group_velocities,
+                                        _labels)
+
+    def _do_q_segment_yaml(self,
+                           emit,
+                           qpoints,
+                           distances,
+                           frequencies,
+                           eigenvectors,
+                           group_velocities,
+                           labels):
         natom = self._cell.get_number_of_atoms()
-        text = []
         for j in range(len(qpoints)):
             q = qpoints[j]
-            text.append("- q-position: [ %12.7f, %12.7f, %12.7f ]" % tuple(q))
-            text.append("  distance: %12.7f" % distances[j])
+            emit("- q-position: [ %12.7f, %12.7f, %12.7f ]" % tuple(q))
+            emit("  distance: %12.7f" % distances[j])
             if labels is not None:
                 if j == 0:
-                    text.append("  label: \'%s\'" % labels[0])
+                    emit("  label: \'%s\'" % labels[0])
                 elif j == len(qpoints) - 1:
-                    text.append("  label: \'%s\'" % labels[1])
-            text.append("  band:")
+                    emit("  label: \'%s\'" % labels[1])
+            emit("  band:")
             for k, freq in enumerate(frequencies[j]):
-                text.append("  - # %d" % (k + 1))
-                text.append("    frequency: %15.10f" % freq)
+                emit("  - # %d" % (k + 1))
+                emit("    frequency: %15.10f" % freq)
 
                 if group_velocities is not None:
                     gv = group_velocities[j, k]
-                    text.append("    group_velocity: "
-                                "[ %13.7f, %13.7f, %13.7f ]" % tuple(gv))
+                    emit("    group_velocity: "
+                         "[ %13.7f, %13.7f, %13.7f ]" % tuple(gv))
 
                 if eigenvectors is not None:
-                    text.append("    eigenvector:")
+                    emit("    eigenvector:")
                     for l in range(natom):
-                        text.append("    - # atom %d" % (l + 1))
+                        emit("    - # atom %d" % (l + 1))
                         for m in (0, 1, 2):
-                            text.append("      - [ %17.14f, %17.14f ]" %
-                                        (eigenvectors[j, l * 3 + m, k].real,
-                                         eigenvectors[j, l * 3 + m, k].imag))
-            text.append('')
-        text.append('')
-
-        return text
+                            emit("      - [ %17.14f, %17.14f ]" %
+                                 (eigenvectors[j, l * 3 + m, k].real,
+                                  eigenvectors[j, l * 3 + m, k].imag))
+            emit('')
+        emit('')
 
     def _set_initial_point(self, qpoint):
         self._lastq = qpoint.copy()
