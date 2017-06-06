@@ -161,9 +161,18 @@ class BandStructure(object):
             text.append('')
             w.write("\n".join(text))
 
-            if self._eigenvectors is not None:
+            # "The eigenvector hack"
+            # Drop everything we're doing, write a binary file, and, most importantly,
+            # do NOT waste time serializing the vectors to yaml.
+            import os
+            if os.getenv('EIGENVECTOR_NPY_HACK') and self._eigenvectors is not None:
                 np.save('eigenvector.npy', self._eigenvectors)
+
+                # don't leave behind an incomplete yaml file
+                w.close()
+                os.unlink(w.name)
                 return
+
             for i in range(len(self._paths)):
                 qpoints = self._paths[i]
                 distances = self._distances[i]
