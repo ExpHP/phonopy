@@ -165,8 +165,12 @@ class BandStructure(object):
             # Drop everything we're doing, write a binary file, and, most importantly,
             # do NOT waste time serializing the vectors to yaml.
             import os
-            if os.getenv('EIGENVECTOR_NPY_HACK') and self._eigenvectors is not None:
-                np.save('eigenvector.npy', self._eigenvectors)
+            if os.getenv('EIGENVECTOR_NPY_HACK'):
+                if self._eigenvectors:
+                    np.save('eigenvector.npy', self._eigenvectors)
+                if self._distances:
+                    np.save('q-distance.npy', self._distances)
+                np.save('eigenvalue.npy', self._eigenvalues)
 
                 # don't leave behind an incomplete yaml file
                 w.close()
