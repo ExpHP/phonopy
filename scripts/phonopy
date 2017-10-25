@@ -712,7 +712,7 @@ elif run_mode == 'band' or run_mode == 'mesh' or run_mode == 'band_mesh':
             comment = {'calculator': interface_mode}
 
         if settings.get_is_hdf5():
-            phonon.write_hdf5_band_structure(labels=settings.get_band_labels(),
+            phonon.write_yaml_band_structure(labels=settings.get_band_labels(),
                                              comment=comment)
         else:
             phonon.write_yaml_band_structure(labels=settings.get_band_labels(),
