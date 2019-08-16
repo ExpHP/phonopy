@@ -185,6 +185,9 @@ def symmetrize_compact_force_constants(force_constants,
 
     """
 
+    import phonopy._phonopy as phonoc
+    import json
+
     s2p_map = primitive.get_supercell_to_primitive_map()
     p2s_map = primitive.get_primitive_to_supercell_map()
     p2p_map = primitive.get_primitive_to_primitive_map()
@@ -192,18 +195,82 @@ def symmetrize_compact_force_constants(force_constants,
     s2pp_map, nsym_list = get_nsym_list_and_s2pp(s2p_map,
                                                  p2p_map,
                                                  permutations)
-    try:
-        import phonopy._phonopy as phonoc
-        phonoc.perm_trans_symmetrize_compact_fc(force_constants,
+
+    def transpose(fcs):
+        fcs = fcs.copy()
+        phonoc.transpose_compact_fc(fcs,
+                                    permutations,
+                                    s2pp_map,
+                                    p2s_map,
+                                    nsym_list)
+        return fcs
+
+    def write_files(path, fcs):
+        import os
+        base, ext = os.path.splitext(path)
+        with open(f'{base}.{ext}', 'w') as f:
+            json.dump(fcs.tolist(), f)
+            print(file=f)
+        with open(f'{base}-t.{ext}', 'w') as f:
+            json.dump(transpose(fcs).tolist(), f)
+            print(file=f)
+
+    perturb_mask = np.random.randint(0, 2, size=force_constants.shape[:2]).astype(bool)
+    zero_mask = np.random.randint(0, 2, size=force_constants.shape[:2]).astype(bool)
+    zero_mask_float33 = np.zeros(shape=force_constants.shape)
+    zero_mask_float33[zero_mask] = 1
+    zero_mask_float33_t = transpose(zero_mask_float33)
+    zero_mask_t = zero_mask_float33_t[:, :, 0, 0].astype(bool)
+    zero_mask = np.logical_or(zero_mask, zero_mask_t)
+
+    force_constants[...] = np.random.random(size=force_constants.shape)
+    phonoc.perm_trans_symmetrize_compact_fc(force_constants,
+                                            permutations,
+                                            s2pp_map,
+                                            p2s_map,
+                                            nsym_list,
+                                            10)
+
+    perturbation = 1e-3 * (2*np.random.random(size=force_constants.shape) - 1)
+    force_constants[zero_mask] = 0
+    force_constants[perturb_mask] += perturbation[perturb_mask]
+
+    force_constants_t = transpose(force_constants)
+
+    # Make sure there is a zero matrix whose transpose is zero
+    def find_it():
+        for r in range(force_constants.shape[0]):
+            for c in range(force_constants.shape[1]):
+                if (force_constants[r][c] == 0).all() and (force_constants_t[r][c] == 0).all():
+                    return r, c
+        raise RuntimeError
+    find_it()
+
+    # Make sure there is a zero matrix whose transpose is not zero
+    def find_it():
+        for r in range(force_constants.shape[0]):
+            for c in range(force_constants.shape[1]):
+                if (force_constants[r][c] == 0).all() and not (force_constants_t[r][c] == 0).all():
+                    return r, c
+        raise RuntimeError
+    find_it()
+
+    with open('input.json', 'w') as f:
+        json.dump(force_constants.tolist(), f)
+        print(file=f)
+
+    for level in range(2+1):
+        fcs = force_constants.copy()
+        phonoc.perm_trans_symmetrize_compact_fc(fcs,
                                                 permutations,
                                                 s2pp_map,
                                                 p2s_map,
                                                 nsym_list,
                                                 level)
-    except ImportError:
-        text = ("Import error at phonoc.perm_trans_symmetrize_compact_fc. "
-                "Corresponding pytono code is not implemented.")
-        raise RuntimeError(text)
+
+        with open(f'output-{level}.json', 'w') as f:
+            json.dump(fcs.tolist(), f)
+            print(file=f)
 
 def distribute_force_constants(force_constants,
                                atom_list_done,
