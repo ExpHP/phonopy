@@ -205,14 +205,24 @@ def symmetrize_compact_force_constants(force_constants,
                                     nsym_list)
         return fcs
 
+    def make_for_rsp2(fcs):
+        # rsp2 wants a matrix that is NSUPERxNSUPER with only
+        # the primitive rows filled
+        dense = np.zeros(shape=[fcs.shape[1], fcs.shape[1], 3, 3])
+        dense[p2s_map] = fcs
+        return dense
+
     def write_files(path, fcs):
         import os
         base, ext = os.path.splitext(path)
-        with open(f'{base}.{ext}', 'w') as f:
+        with open(f'{base}{ext}', 'w') as f:
             json.dump(fcs.tolist(), f)
             print(file=f)
-        with open(f'{base}-t.{ext}', 'w') as f:
+        with open(f'{base}-t{ext}', 'w') as f:
             json.dump(transpose(fcs).tolist(), f)
+            print(file=f)
+        with open(f'{base}-rsp2{ext}', 'w') as f:
+            json.dump(make_for_rsp2(fcs).tolist(), f)
             print(file=f)
 
     perturb_mask = np.random.randint(0, 2, size=force_constants.shape[:2]).astype(bool)
@@ -255,9 +265,7 @@ def symmetrize_compact_force_constants(force_constants,
         raise RuntimeError
     find_it()
 
-    with open('input.json', 'w') as f:
-        json.dump(force_constants.tolist(), f)
-        print(file=f)
+    write_files('input.json', force_constants)
 
     for level in range(2+1):
         fcs = force_constants.copy()
@@ -268,9 +276,7 @@ def symmetrize_compact_force_constants(force_constants,
                                                 nsym_list,
                                                 level)
 
-        with open(f'output-{level}.json', 'w') as f:
-            json.dump(fcs.tolist(), f)
-            print(file=f)
+        write_files(f'output-{level}.json', fcs)
 
 def distribute_force_constants(force_constants,
                                atom_list_done,
