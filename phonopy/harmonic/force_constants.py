@@ -196,6 +196,9 @@ def symmetrize_compact_force_constants(force_constants,
                                                  p2p_map,
                                                  permutations)
 
+    original_array = force_constants
+    force_constants = original_array.copy()
+
     def transpose(fcs):
         fcs = fcs.copy()
         phonoc.transpose_compact_fc(fcs,
@@ -277,6 +280,15 @@ def symmetrize_compact_force_constants(force_constants,
                                                 level)
 
         write_files(f'output-{level}.json', fcs)
+
+    # make the function work as expected
+    force_constants = original_array
+    phonoc.perm_trans_symmetrize_compact_fc(force_constants,
+                                            permutations,
+                                            s2pp_map,
+                                            p2s_map,
+                                            nsym_list,
+                                            level)
 
 def distribute_force_constants(force_constants,
                                atom_list_done,
