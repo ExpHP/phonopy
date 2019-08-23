@@ -313,6 +313,7 @@ class BandStructure(object):
         self._set_frequencies()
 
     def _solve_dm_on_path(self, path):
+        global COUNTER
         is_nac = self._dynamical_matrix.is_nac()
         distances_on_path = []
         eigvals_on_path = []
@@ -338,6 +339,9 @@ class BandStructure(object):
             dm = self._dynamical_matrix.get_dynamical_matrix()
 
             if self._is_eigenvectors:
+                import scipy.sparse
+                scipy.sparse.save_npz('dynmat-{}.npz'.format(COUNTER), scipy.sparse.bsr_matrix(dm, blocksize=(3,3)))
+                COUNTER += 1
                 eigvals, eigvecs = np.linalg.eigh(dm)
                 eigvals = eigvals.real
             else:
@@ -371,3 +375,5 @@ class BandStructure(object):
             frequencies.append(np.sqrt(abs(eigs_path)) * np.sign(eigs_path)
                                * self._factor)
         self._frequencies = frequencies
+
+COUNTER=0
